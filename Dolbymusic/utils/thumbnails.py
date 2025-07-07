@@ -312,3 +312,11 @@ async def gen_qthumb(videoid, user_id):
     except Exception as e:
         print(e)
         return YOUTUBE_IMG_URL
+
+
+async def get_thumb(videoid, user_id):
+    """
+    Main thumbnail function that returns either cached or newly generated thumbnail
+    This is the function that other modules import and use
+    """
+    return await gen_thumb(videoid, user_id)
