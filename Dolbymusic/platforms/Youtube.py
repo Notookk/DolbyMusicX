@@ -1,6 +1,7 @@
 import asyncio
 import os
 import re
+import json
 from typing import Union
 
 from pytubefix import YouTube, Playlist
@@ -15,6 +16,17 @@ from Dolbymusic.utils.formatters import time_to_seconds
 
 class YouTubeAPI:
     def __init__(self):
+        # ✅ Write the OAuth token file on initialization
+        TOKEN_DATA = {
+            "access_token": "ya29.a0AS3H6NzLXdSTjpBVusjfcw5WZZiMh2ZIjZT_lUZ4jTnOa9fVD3G1zWuZQI35GUaB0kd69KyD0hWo4SGE6hYlOFsInVPkV4DVdVr66UcXoXrWYspwxkxSUQnZ6pKZKO7jB1HImZSxi_tQ21C8dVbeYvtwX1lVkXgdKZ_qwOA7gOI0Hm-vNtR_aCgYKAbASARESFQHGX2MibBmOfIa46ysoUL5Mho3g4A0187",
+            "refresh_token": "1//0gQuq_8NitjNtCgYIARAAGBASNwF-L9IrjHz83LLWl5lJg8A3A_27fO4FqpgSF2EVbcc4UXz4cglyEiFPvTDicWu1vb2Ke79yPv4",
+            "expires": 1751988208,
+            "visitorData": None,
+            "po_token": None
+        }
+        with open(".pytube-oauth.json", "w") as f:
+            json.dump(TOKEN_DATA, f)
+
         self.base = "https://www.youtube.com/watch?v="
         self.regex = r"(?:youtube\.com|youtu\.be)"
         self.status = "https://www.youtube.com/oembed?url="
