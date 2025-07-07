@@ -1,3 +1,17 @@
+import asyncio
+import os
+import re
+import json
+from typing import Union
+from pytubefix import YouTube, Playlist
+from pytubefix.exceptions import VideoUnavailable, PytubeFixError
+from pyrogram.enums import MessageEntityType
+from pyrogram.types import Message
+from youtubesearchpython.__future__ import VideosSearch
+
+from Dolbymusic.utils.database import is_on_off
+from Dolbymusic.utils.formatters import time_to_seconds
+
 class YouTubeAPI:
     def __init__(self):
         # ✅ Write the OAuth token file into pytubefix __cache__ directory
