@@ -2,7 +2,7 @@
 
 # 🎵 ──「 Dolby Atmos Music 」──
 
-<img src="/Dolbymusic/assets/Pic.jpg" alt="SoloCloud Music Bot" width="400" style="border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.4);">
+<img src="/Dolbymusic/assets/Pic.jpg" alt="Dolby Music Music Bot" width="400" style="border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.4);">
 
 ### ✨ *The Ultimate Telegram Music Experience* ✨
 
@@ -66,7 +66,7 @@
 
 <div align="center">
 
-## 🚀 **What Makes SoloCloud Special?**
+## 🚀 **What Makes Dolby Music Special?**
 
 </div>
 
@@ -139,10 +139,10 @@ python3 -m Dolbymusic
 
 ```bash
 # Build Docker image
-docker build -t solocloud-bot .
+docker build -t Dolby Music-bot .
 
 # Run with environment file
-docker run -d --env-file .env solocloud-bot
+docker run -d --env-file .env Dolby Music-bot
 ```
 
 </details>
