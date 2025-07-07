@@ -24,3 +24,4 @@ pytubefix
 youtube-search
 youtube-search-python
 pyrofork
+httpx==0.23.3
