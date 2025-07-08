@@ -16,7 +16,7 @@ from Dolbymusic.utils.formatters import time_to_seconds
 
 # ============== CONFIGURE YOUR API ==============
 YOUR_API_URL = "http://45.38.42.10:8000"
-YOUR_API_KEY = "10968cc13c074e53b3039b8eead672fd"            # <--- Change me!
+YOUR_API_KEY = "b1569d174a144d8cb9a7df126225b181"            # <--- Change me!
 # ================================================
 
 async def get_file_from_api(video_id, audio=True):
