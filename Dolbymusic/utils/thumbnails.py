@@ -76,11 +76,17 @@ async def gen_thumb(videoid, user_id):
 
         try:
             wxyz = await app.get_profile_photos(user_id)
-            wxy = await app.download_media(wxyz[0]['file_id'], file_name=f'{user_id}.jpg')
+            if wxyz.photos:
+                wxy = await app.download_media(wxyz.photos[0].file_id, file_name=f'{user_id}.jpg')
+            else:
+                raise Exception("No profile photos found")
         except Exception:
             try:
                 hehe = await app.get_profile_photos(app.id)
-                wxy = await app.download_media(hehe[0]['file_id'], file_name=f'{app.id}.jpg')
+                if hehe.photos:
+                    wxy = await app.download_media(hehe.photos[0].file_id, file_name=f'{app.id}.jpg')
+                else:
+                    raise Exception("No bot profile photos found")
             except Exception:
                 # Create a default profile image
                 default_img = Image.new("RGB", (640, 640), color="blue")
