@@ -435,7 +435,7 @@ class Call(PyTgCalls):
                         user,
                     ),
                     reply_markup=InlineKeyboardMarkup(button),
-                parse_mode=ParseMode.MARKDOWN_V2,
+                parse_mode=ParseMode.MARKDOWN,
                 )
                 db[chat_id][0]["mystic"] = run
                 db[chat_id][0]["markup"] = "tg"
@@ -483,7 +483,7 @@ class Call(PyTgCalls):
                         user,
                     ),
                     reply_markup=InlineKeyboardMarkup(button),
-                parse_mode=ParseMode.MARKDOWN_V2,
+                parse_mode=ParseMode.MARKDOWN,
                 )
                 db[chat_id][0]["mystic"] = run
                 db[chat_id][0]["markup"] = "stream"
@@ -510,7 +510,7 @@ class Call(PyTgCalls):
                     photo=config.STREAM_IMG_URL,
                     caption=_["stream_2"].format(user),
                     reply_markup=InlineKeyboardMarkup(button),
-                parse_mode=ParseMode.MARKDOWN_V2,
+                parse_mode=ParseMode.MARKDOWN,
                 )
                 db[chat_id][0]["mystic"] = run
                 db[chat_id][0]["markup"] = "tg"
@@ -544,7 +544,7 @@ class Call(PyTgCalls):
                             config.SUPPORT_CHAT, title[:23], check[0]["dur"], user
                         ),
                         reply_markup=InlineKeyboardMarkup(button),
-                    parse_mode=ParseMode.MARKDOWN_V2,
+                    parse_mode=ParseMode.MARKDOWN,
                     )
                     db[chat_id][0]["mystic"] = run
                     db[chat_id][0]["markup"] = "tg"
@@ -557,7 +557,7 @@ class Call(PyTgCalls):
                             config.SUPPORT_CHAT, title[:23], check[0]["dur"], user
                         ),
                         reply_markup=InlineKeyboardMarkup(button),
-                    parse_mode=ParseMode.MARKDOWN_V2,
+                    parse_mode=ParseMode.MARKDOWN,
                     )
                     db[chat_id][0]["mystic"] = run
                     db[chat_id][0]["markup"] = "tg"
@@ -574,7 +574,7 @@ class Call(PyTgCalls):
                             user,
                         ),
                         reply_markup=InlineKeyboardMarkup(button),
-                    parse_mode=ParseMode.MARKDOWN_V2,
+                    parse_mode=ParseMode.MARKDOWN,
                     )
                     db[chat_id][0]["mystic"] = run
                     db[chat_id][0]["markup"] = "stream"
