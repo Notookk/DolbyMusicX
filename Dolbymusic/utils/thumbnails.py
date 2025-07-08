@@ -27,12 +27,15 @@ def add_corners(im):
     bigsize = (im.size[0] * 3, im.size[1] * 3)
     mask = Image.new("L", bigsize, 0)
     ImageDraw.Draw(mask).ellipse((0, 0) + bigsize, fill=255)
-    mask = mask.resize(im.size, Image.ANTIALIAS)
+    mask = mask.resize(im.size, Image.LANCZOS)
     mask = ImageChops.darker(mask, im.split()[-1])
     im.putalpha(mask)
 
 
 async def gen_thumb(videoid, user_id):
+    # Ensure cache directory exists
+    os.makedirs("cache", exist_ok=True)
+    
     if os.path.isfile(f"cache/{videoid}_{user_id}.png"):
         return f"cache/{videoid}_{user_id}.png"
     url = f"https://www.youtube.com/watch?v={videoid}"
@@ -101,7 +104,7 @@ async def gen_thumb(videoid, user_id):
         x2 = Xcenter + 250
         y2 = Ycenter + 250
         logo = youtube.crop((x1, y1, x2, y2))
-        logo.thumbnail((520, 520), Image.ANTIALIAS)
+        logo.thumbnail((520, 520), Image.LANCZOS)
         logo.save(f"cache/chop{videoid}.png")
         if not os.path.isfile(f"cache/cropped{videoid}.png"):
             im = Image.open(f"cache/chop{videoid}.png").convert("RGBA")
@@ -110,7 +113,7 @@ async def gen_thumb(videoid, user_id):
 
         crop_img = Image.open(f"cache/cropped{videoid}.png")
         logo = crop_img.convert("RGBA")
-        logo.thumbnail((365, 365), Image.ANTIALIAS)
+        logo.thumbnail((365, 365), Image.LANCZOS)
         width = int((1280 - 365) / 2)
         background = Image.open(f"cache/temp{videoid}.png")
         background.paste(logo, (width + 2, 138), mask=logo)
@@ -132,8 +135,9 @@ async def gen_thumb(videoid, user_id):
                 stroke_fill="grey",
                 font=font,
             )
-            if para[0]:
-                text_w, text_h = draw.textsize(f"{para[0]}", font=font)
+            if len(para) > 0 and para[0]:
+                bbox = draw.textbbox((0, 0), f"{para[0]}", font=font)
+                text_w = bbox[2] - bbox[0]
                 draw.text(
                     ((1280 - text_w) / 2, 530),
                     f"{para[0]}",
@@ -142,8 +146,9 @@ async def gen_thumb(videoid, user_id):
                     stroke_fill="white",
                     font=font,
                 )
-            if para[1]:
-                text_w, text_h = draw.textsize(f"{para[1]}", font=font)
+            if len(para) > 1 and para[1]:
+                bbox = draw.textbbox((0, 0), f"{para[1]}", font=font)
+                text_w = bbox[2] - bbox[0]
                 draw.text(
                     ((1280 - text_w) / 2, 580),
                     f"{para[1]}",
@@ -154,7 +159,8 @@ async def gen_thumb(videoid, user_id):
                 )
         except:
             pass
-        text_w, text_h = draw.textsize(f"Duration: {duration} Mins", font=arial)
+        bbox = draw.textbbox((0, 0), f"Duration: {duration} Mins", font=arial)
+        text_w = bbox[2] - bbox[0]
         draw.text(
             ((1280 - text_w) / 2, 660),
             f"Duration: {duration} Mins",
@@ -173,6 +179,9 @@ async def gen_thumb(videoid, user_id):
 
 
 async def gen_qthumb(videoid, user_id):
+    # Ensure cache directory exists
+    os.makedirs("cache", exist_ok=True)
+    
     if os.path.isfile(f"cache/que{videoid}_{user_id}.png"):
         return f"cache/que{videoid}_{user_id}.png"
     url = f"https://www.youtube.com/watch?v={videoid}"
@@ -241,7 +250,7 @@ async def gen_qthumb(videoid, user_id):
         x2 = Xcenter + 250
         y2 = Ycenter + 250
         logo = youtube.crop((x1, y1, x2, y2))
-        logo.thumbnail((520, 520), Image.ANTIALIAS)
+        logo.thumbnail((520, 520), Image.LANCZOS)
         logo.save(f"cache/chop{videoid}.png")
         if not os.path.isfile(f"cache/cropped{videoid}.png"):
             im = Image.open(f"cache/chop{videoid}.png").convert("RGBA")
@@ -250,7 +259,7 @@ async def gen_qthumb(videoid, user_id):
 
         crop_img = Image.open(f"cache/cropped{videoid}.png")
         logo = crop_img.convert("RGBA")
-        logo.thumbnail((365, 365), Image.ANTIALIAS)
+        logo.thumbnail((365, 365), Image.LANCZOS)
         width = int((1280 - 365) / 2)
         background = Image.open(f"cache/temp{videoid}.png")
         background.paste(logo, (width + 2, 138), mask=logo)
@@ -272,8 +281,9 @@ async def gen_qthumb(videoid, user_id):
                 stroke_fill="black",
                 font=font,
             )
-            if para[0]:
-                text_w, text_h = draw.textsize(f"{para[0]}", font=font)
+            if len(para) > 0 and para[0]:
+                bbox = draw.textbbox((0, 0), f"{para[0]}", font=font)
+                text_w = bbox[2] - bbox[0]
                 draw.text(
                     ((1280 - text_w) / 2, 530),
                     f"{para[0]}",
@@ -282,8 +292,9 @@ async def gen_qthumb(videoid, user_id):
                     stroke_fill="white",
                     font=font,
                 )
-            if para[1]:
-                text_w, text_h = draw.textsize(f"{para[1]}", font=font)
+            if len(para) > 1 and para[1]:
+                bbox = draw.textbbox((0, 0), f"{para[1]}", font=font)
+                text_w = bbox[2] - bbox[0]
                 draw.text(
                     ((1280 - text_w) / 2, 580),
                     f"{para[1]}",
@@ -294,7 +305,8 @@ async def gen_qthumb(videoid, user_id):
                 )
         except:
             pass
-        text_w, text_h = draw.textsize(f"Duration: {duration} Mins", font=arial)
+        bbox = draw.textbbox((0, 0), f"Duration: {duration} Mins", font=arial)
+        text_w = bbox[2] - bbox[0]
         draw.text(
             ((1280 - text_w) / 2, 660),
             f"Duration: {duration} Mins",
