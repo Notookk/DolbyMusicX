@@ -74,38 +74,87 @@ async def gen_thumb(videoid, user_id):
                     await f.write(await resp.read())
                     await f.close()
 
+        # Try to get user profile photo
+        wxy = None
         try:
-            wxyz = await app.get_profile_photos(user_id)
-            if wxyz.photos:
-                wxy = await app.download_media(wxyz.photos[0].file_id, file_name=f'{user_id}.jpg')
+            # First try to get user's profile photos
+            user_photos = await app.get_profile_photos(user_id)
+            if user_photos.total_count > 0 and user_photos.photos:
+                # Download the first (latest) profile photo
+                # Access the largest size photo (index -1 for largest)
+                photo = user_photos.photos[0][-1]  # Get largest size
+                photo_file = await app.download_media(
+                    photo.file_id, 
+                    file_name=f"cache/user_{user_id}.jpg"
+                )
+                wxy = photo_file
+                print(f"Successfully downloaded user {user_id} profile photo")
             else:
-                raise Exception("No profile photos found")
-        except Exception:
+                print(f"User {user_id} has no profile photos")
+                raise Exception("User has no profile photos")
+        except Exception as e:
+            print(f"Failed to get user profile photo: {e}")
             try:
-                hehe = await app.get_profile_photos(app.id)
-                if hehe.photos:
-                    wxy = await app.download_media(hehe.photos[0].file_id, file_name=f'{app.id}.jpg')
+                # Fallback to bot's profile photo
+                bot_photos = await app.get_profile_photos(app.id)
+                if bot_photos.total_count > 0 and bot_photos.photos:
+                    photo = bot_photos.photos[0][-1]  # Get largest size
+                    photo_file = await app.download_media(
+                        photo.file_id, 
+                        file_name=f"cache/bot_{app.id}.jpg"
+                    )
+                    wxy = photo_file
+                    print(f"Using bot profile photo as fallback")
                 else:
-                    raise Exception("No bot profile photos found")
-            except Exception:
-                # Create a default profile image
-                default_img = Image.new("RGB", (640, 640), color="blue")
+                    raise Exception("Bot also has no profile photos")
+            except Exception as e2:
+                print(f"Failed to get bot profile photo: {e2}")
+                # Create a default profile image with a gradient
+                default_img = Image.new("RGB", (640, 640), color="#4169E1")
+                # Add a simple gradient effect
+                draw = ImageDraw.Draw(default_img)
+                for i in range(640):
+                    color = int(65 + (i / 640) * 100)  # Gradient from dark to light blue
+                    draw.line([(i, 0), (i, 640)], fill=(color, color, 255))
                 wxy = f"cache/default_{user_id}.jpg"
                 default_img.save(wxy)
+                print(f"Created default profile image at {wxy}")
         
+        # Process the profile image to make it circular
         try:
+            # Open and resize the profile image
             xy = Image.open(wxy)
-            a = Image.new('L', [640, 640], 0)
-            b = ImageDraw.Draw(a)
-            b.pieslice([(0, 0), (640,640)], 0, 360, fill = 255, outline = "white")
-            c = np.array(xy)
-            d = np.array(a)
-            e = np.dstack((c, d))
-            f = Image.fromarray(e)
-            x = f.resize((107, 107))
-        except Exception:
-            # Create a default circular profile image
-            x = Image.new("RGB", (107, 107), color="blue")
+            # Convert to RGB if needed
+            if xy.mode in ("RGBA", "LA", "P"):
+                xy = xy.convert("RGB")
+            # Resize to 640x640 first
+            xy = xy.resize((640, 640), Image.LANCZOS)
+            
+            # Create a new RGBA image for the circular effect
+            output = Image.new("RGBA", (640, 640), (0, 0, 0, 0))
+            
+            # Create circular mask
+            mask = Image.new('L', (640, 640), 0)
+            mask_draw = ImageDraw.Draw(mask)
+            mask_draw.ellipse([(0, 0), (640, 640)], fill=255)
+            
+            # Paste the image using the mask
+            output.paste(xy, (0, 0))
+            output.putalpha(mask)
+            
+            # Resize to final size for thumbnail
+            x = output.resize((107, 107), Image.LANCZOS)
+            print(f"Successfully processed profile image to circular format")
+        except Exception as e:
+            print(f"Failed to process profile image: {e}")
+            # Create a default circular profile image with better design
+            x = Image.new("RGBA", (107, 107), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(x)
+            # Create a nice gradient circle
+            draw.ellipse([(0, 0), (107, 107)], fill="#4169E1", outline="#1E90FF", width=3)
+            # Add initials or icon in the center
+            draw.ellipse([(25, 25), (82, 82)], fill="#1E90FF")
+            print("Created fallback circular profile image")
 
         try:
             youtube = Image.open(f"cache/thumb{videoid}.png")
@@ -162,9 +211,15 @@ async def gen_thumb(videoid, user_id):
             width = int((1280 - 365) / 2)
             background = Image.open(f"cache/temp{videoid}.png")
             background.paste(logo, (width + 2, 138), mask=logo)
+            
+            # Paste the profile image with proper handling
+            if x.mode != "RGBA":
+                x = x.convert("RGBA")
             background.paste(x, (710, 427), mask=x)
             background.paste(image3, (0, 0), mask=image3)
-        except Exception:
+            print(f"Successfully composed final thumbnail with profile image")
+        except Exception as e:
+            print(f"Failed to compose final thumbnail: {e}")
             # Create a fallback background
             background = Image.new("RGBA", (1280, 720), color=(80, 80, 80, 255))
 
