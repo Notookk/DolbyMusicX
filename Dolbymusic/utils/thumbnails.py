@@ -74,153 +74,117 @@ async def gen_thumb(videoid, user_id):
                     await f.write(await resp.read())
                     await f.close()
 
-        # Try to get user profile photo - using multiple methods
+        # Try to get user profile photo - comprehensive debugging approach
         wxy = None
+        debug_info = []
+        
         try:
+            debug_info.append(f"Starting profile photo fetch for user {user_id}")
+            
             # Method 1: Try get_profile_photos (for users)
             try:
+                debug_info.append("Attempting get_profile_photos...")
                 user_photos = await app.get_profile_photos(user_id)
-                if user_photos and user_photos.total_count > 0:
-                    # Get the first photo (most recent)
-                    first_photo = user_photos.photos[0]
-                    
-                    # Try to download the photo - handle different structures
-                    photo_file = None
-                    if hasattr(first_photo, 'file_id'):
-                        # Direct photo object
-                        photo_file = await app.download_media(
-                            first_photo.file_id, 
-                            file_name=f"cache/user_{user_id}.jpg"
-                        )
-                    elif isinstance(first_photo, list) and len(first_photo) > 0:
-                        # Photo is a list of sizes, try largest first
-                        for size_photo in reversed(first_photo):
-                            try:
-                                if hasattr(size_photo, 'file_id'):
-                                    photo_file = await app.download_media(
-                                        size_photo.file_id, 
-                                        file_name=f"cache/user_{user_id}.jpg"
-                                    )
-                                    break
-                                else:
-                                    photo_file = await app.download_media(
-                                        size_photo, 
-                                        file_name=f"cache/user_{user_id}.jpg"
-                                    )
-                                    break
-                            except Exception:
-                                continue
-                    else:
-                        # Try direct download
-                        photo_file = await app.download_media(
-                            first_photo, 
-                            file_name=f"cache/user_{user_id}.jpg"
-                        )
-                    
-                    if photo_file and os.path.exists(photo_file):
-                        wxy = photo_file
-                        print(f"Method 1: Successfully downloaded user {user_id} profile photo")
-                    else:
-                        raise Exception("Photo download failed")
-                else:
-                    raise Exception("No profile photos found")
-            except Exception as e1:
-                print(f"Method 1 failed: {e1}")
+                debug_info.append(f"get_profile_photos returned: {type(user_photos)}")
                 
-                # Method 2: Try get_chat_photos (for chats/groups)
-                try:
-                    user_photos = await app.get_chat_photos(user_id)
-                    if user_photos and hasattr(user_photos, 'total_count') and user_photos.total_count > 0:
+                if user_photos and hasattr(user_photos, 'total_count'):
+                    debug_info.append(f"Profile photos total_count: {user_photos.total_count}")
+                    if user_photos.total_count > 0 and hasattr(user_photos, 'photos') and user_photos.photos:
                         first_photo = user_photos.photos[0]
+                        debug_info.append(f"First photo type: {type(first_photo)}")
                         
-                        # Handle different photo structures
-                        photo_file = None
-                        if hasattr(first_photo, 'file_id'):
-                            photo_file = await app.download_media(
-                                first_photo.file_id, 
-                                file_name=f"cache/user_{user_id}.jpg"
-                            )
-                        elif isinstance(first_photo, list) and len(first_photo) > 0:
-                            for size_photo in reversed(first_photo):
-                                try:
-                                    if hasattr(size_photo, 'file_id'):
-                                        photo_file = await app.download_media(
-                                            size_photo.file_id, 
-                                            file_name=f"cache/user_{user_id}.jpg"
-                                        )
-                                        break
-                                    else:
-                                        photo_file = await app.download_media(
-                                            size_photo, 
-                                            file_name=f"cache/user_{user_id}.jpg"
-                                        )
-                                        break
-                                except Exception:
-                                    continue
-                        else:
+                        # Simple download attempt
+                        try:
                             photo_file = await app.download_media(
                                 first_photo, 
                                 file_name=f"cache/user_{user_id}.jpg"
                             )
-                        
-                        if photo_file and os.path.exists(photo_file):
-                            wxy = photo_file
-                            print(f"Method 2: Successfully downloaded user {user_id} profile photo")
-                        else:
-                            raise Exception("Chat photo download failed")
+                            if photo_file and os.path.exists(photo_file):
+                                wxy = photo_file
+                                debug_info.append(f"SUCCESS: Downloaded user photo to {photo_file}")
+                            else:
+                                debug_info.append("Download returned None or file doesn't exist")
+                                raise Exception("Download failed")
+                        except Exception as download_err:
+                            debug_info.append(f"Download error: {download_err}")
+                            # If it's a list, try the largest size
+                            if isinstance(first_photo, list) and len(first_photo) > 0:
+                                try:
+                                    largest_photo = first_photo[-1]  # Last is usually largest
+                                    photo_file = await app.download_media(
+                                        largest_photo, 
+                                        file_name=f"cache/user_{user_id}.jpg"
+                                    )
+                                    if photo_file and os.path.exists(photo_file):
+                                        wxy = photo_file
+                                        debug_info.append(f"SUCCESS: Downloaded largest size to {photo_file}")
+                                    else:
+                                        raise Exception("Largest size download failed")
+                                except Exception as e:
+                                    debug_info.append(f"Largest size download error: {e}")
+                                    raise Exception("All download attempts failed")
+                            else:
+                                raise Exception("Not a list or empty list")
                     else:
-                        raise Exception("No chat photos found")
+                        raise Exception(f"No photos available (count: {getattr(user_photos, 'total_count', 'unknown')})")
+                else:
+                    raise Exception("Invalid user_photos response")
+                    
+            except Exception as e1:
+                debug_info.append(f"Method 1 failed: {e1}")
+                
+                # Method 2: Try a different approach - get user info first
+                try:
+                    debug_info.append("Attempting to get user info...")
+                    user_info = await app.get_users(user_id)
+                    debug_info.append(f"User info: {type(user_info)}")
+                    
+                    if user_info and hasattr(user_info, 'photo') and user_info.photo:
+                        debug_info.append(f"User has photo: {type(user_info.photo)}")
+                        try:
+                            photo_file = await app.download_media(
+                                user_info.photo.big_file_id if hasattr(user_info.photo, 'big_file_id') else user_info.photo,
+                                file_name=f"cache/user_{user_id}.jpg"
+                            )
+                            if photo_file and os.path.exists(photo_file):
+                                wxy = photo_file
+                                debug_info.append(f"SUCCESS: Downloaded user photo via user info to {photo_file}")
+                            else:
+                                raise Exception("User info photo download failed")
+                        except Exception as download_err:
+                            debug_info.append(f"User info photo download error: {download_err}")
+                            raise Exception("User info method failed")
+                    else:
+                        raise Exception("User has no photo in user info")
+                        
                 except Exception as e2:
-                    print(f"Method 2 failed: {e2}")
+                    debug_info.append(f"Method 2 failed: {e2}")
                     raise Exception("All user photo methods failed")
                     
         except Exception as e:
-            print(f"Failed to get user profile photo: {e}")
+            debug_info.append(f"All user methods failed: {e}")
+            
+            # Fallback to bot's profile photo
             try:
-                # Fallback to bot's profile photo
+                debug_info.append("Attempting bot profile photo fallback...")
                 bot_photos = await app.get_profile_photos(app.id)
-                if bot_photos and bot_photos.total_count > 0:
+                if bot_photos and hasattr(bot_photos, 'total_count') and bot_photos.total_count > 0:
                     first_photo = bot_photos.photos[0]
-                    
-                    photo_file = None
-                    if hasattr(first_photo, 'file_id'):
-                        photo_file = await app.download_media(
-                            first_photo.file_id, 
-                            file_name=f"cache/bot_{app.id}.jpg"
-                        )
-                    elif isinstance(first_photo, list) and len(first_photo) > 0:
-                        for size_photo in reversed(first_photo):
-                            try:
-                                if hasattr(size_photo, 'file_id'):
-                                    photo_file = await app.download_media(
-                                        size_photo.file_id, 
-                                        file_name=f"cache/bot_{app.id}.jpg"
-                                    )
-                                    break
-                                else:
-                                    photo_file = await app.download_media(
-                                        size_photo, 
-                                        file_name=f"cache/bot_{app.id}.jpg"
-                                    )
-                                    break
-                            except Exception:
-                                continue
-                    else:
-                        photo_file = await app.download_media(
-                            first_photo, 
-                            file_name=f"cache/bot_{app.id}.jpg"
-                        )
-                    
+                    photo_file = await app.download_media(
+                        first_photo, 
+                        file_name=f"cache/bot_{app.id}.jpg"
+                    )
                     if photo_file and os.path.exists(photo_file):
                         wxy = photo_file
-                        print(f"Using bot profile photo as fallback")
+                        debug_info.append(f"SUCCESS: Using bot profile photo {photo_file}")
                     else:
                         raise Exception("Bot photo download failed")
                 else:
                     raise Exception("Bot has no profile photos")
             except Exception as e2:
-                print(f"Failed to get bot profile photo: {e2}")
-                # Create a default profile image - improved design
+                debug_info.append(f"Bot fallback failed: {e2}")
+                
+                # Final fallback: create default image
                 default_img = Image.new("RGB", (640, 640), color="#2C3E50")
                 draw = ImageDraw.Draw(default_img)
                 
@@ -235,7 +199,11 @@ async def gen_thumb(videoid, user_id):
                 
                 wxy = f"cache/default_{user_id}.jpg"
                 default_img.save(wxy)
-                print(f"Created enhanced default profile image at {wxy}")
+                debug_info.append(f"Created default profile image at {wxy}")
+        
+        # Print all debug info
+        for info in debug_info:
+            print(f"PFP DEBUG: {info}")
         
         # Process the profile image to make it circular - robust approach
         try:
@@ -478,153 +446,117 @@ async def gen_qthumb(videoid, user_id):
                     await f.write(await resp.read())
                     await f.close()
 
-        # Try to get user profile photo - using multiple methods (same as gen_thumb)
+        # Try to get user profile photo - comprehensive debugging approach (same as gen_thumb)
         wxy = None
+        debug_info = []
+        
         try:
+            debug_info.append(f"Starting profile photo fetch for user {user_id} (queue)")
+            
             # Method 1: Try get_profile_photos (for users)
             try:
+                debug_info.append("Attempting get_profile_photos for queue...")
                 user_photos = await app.get_profile_photos(user_id)
-                if user_photos and user_photos.total_count > 0:
-                    # Get the first photo (most recent)
-                    first_photo = user_photos.photos[0]
-                    
-                    # Try to download the photo - handle different structures
-                    photo_file = None
-                    if hasattr(first_photo, 'file_id'):
-                        # Direct photo object
-                        photo_file = await app.download_media(
-                            first_photo.file_id, 
-                            file_name=f"cache/user_{user_id}_queue.jpg"
-                        )
-                    elif isinstance(first_photo, list) and len(first_photo) > 0:
-                        # Photo is a list of sizes, try largest first
-                        for size_photo in reversed(first_photo):
-                            try:
-                                if hasattr(size_photo, 'file_id'):
-                                    photo_file = await app.download_media(
-                                        size_photo.file_id, 
-                                        file_name=f"cache/user_{user_id}_queue.jpg"
-                                    )
-                                    break
-                                else:
-                                    photo_file = await app.download_media(
-                                        size_photo, 
-                                        file_name=f"cache/user_{user_id}_queue.jpg"
-                                    )
-                                    break
-                            except Exception:
-                                continue
-                    else:
-                        # Try direct download
-                        photo_file = await app.download_media(
-                            first_photo, 
-                            file_name=f"cache/user_{user_id}_queue.jpg"
-                        )
-                    
-                    if photo_file and os.path.exists(photo_file):
-                        wxy = photo_file
-                        print(f"Method 1: Successfully downloaded user {user_id} profile photo for queue")
-                    else:
-                        raise Exception("Photo download failed")
-                else:
-                    raise Exception("No profile photos found")
-            except Exception as e1:
-                print(f"Method 1 failed for queue: {e1}")
+                debug_info.append(f"get_profile_photos returned: {type(user_photos)}")
                 
-                # Method 2: Try get_chat_photos (for chats/groups)
-                try:
-                    user_photos = await app.get_chat_photos(user_id)
-                    if user_photos and hasattr(user_photos, 'total_count') and user_photos.total_count > 0:
+                if user_photos and hasattr(user_photos, 'total_count'):
+                    debug_info.append(f"Profile photos total_count: {user_photos.total_count}")
+                    if user_photos.total_count > 0 and hasattr(user_photos, 'photos') and user_photos.photos:
                         first_photo = user_photos.photos[0]
+                        debug_info.append(f"First photo type: {type(first_photo)}")
                         
-                        # Handle different photo structures
-                        photo_file = None
-                        if hasattr(first_photo, 'file_id'):
-                            photo_file = await app.download_media(
-                                first_photo.file_id, 
-                                file_name=f"cache/user_{user_id}_queue.jpg"
-                            )
-                        elif isinstance(first_photo, list) and len(first_photo) > 0:
-                            for size_photo in reversed(first_photo):
-                                try:
-                                    if hasattr(size_photo, 'file_id'):
-                                        photo_file = await app.download_media(
-                                            size_photo.file_id, 
-                                            file_name=f"cache/user_{user_id}_queue.jpg"
-                                        )
-                                        break
-                                    else:
-                                        photo_file = await app.download_media(
-                                            size_photo, 
-                                            file_name=f"cache/user_{user_id}_queue.jpg"
-                                        )
-                                        break
-                                except Exception:
-                                    continue
-                        else:
+                        # Simple download attempt
+                        try:
                             photo_file = await app.download_media(
                                 first_photo, 
                                 file_name=f"cache/user_{user_id}_queue.jpg"
                             )
-                        
-                        if photo_file and os.path.exists(photo_file):
-                            wxy = photo_file
-                            print(f"Method 2: Successfully downloaded user {user_id} profile photo for queue")
-                        else:
-                            raise Exception("Chat photo download failed")
+                            if photo_file and os.path.exists(photo_file):
+                                wxy = photo_file
+                                debug_info.append(f"SUCCESS: Downloaded user photo to {photo_file}")
+                            else:
+                                debug_info.append("Download returned None or file doesn't exist")
+                                raise Exception("Download failed")
+                        except Exception as download_err:
+                            debug_info.append(f"Download error: {download_err}")
+                            # If it's a list, try the largest size
+                            if isinstance(first_photo, list) and len(first_photo) > 0:
+                                try:
+                                    largest_photo = first_photo[-1]  # Last is usually largest
+                                    photo_file = await app.download_media(
+                                        largest_photo, 
+                                        file_name=f"cache/user_{user_id}_queue.jpg"
+                                    )
+                                    if photo_file and os.path.exists(photo_file):
+                                        wxy = photo_file
+                                        debug_info.append(f"SUCCESS: Downloaded largest size to {photo_file}")
+                                    else:
+                                        raise Exception("Largest size download failed")
+                                except Exception as e:
+                                    debug_info.append(f"Largest size download error: {e}")
+                                    raise Exception("All download attempts failed")
+                            else:
+                                raise Exception("Not a list or empty list")
                     else:
-                        raise Exception("No chat photos found")
+                        raise Exception(f"No photos available (count: {getattr(user_photos, 'total_count', 'unknown')})")
+                else:
+                    raise Exception("Invalid user_photos response")
+                    
+            except Exception as e1:
+                debug_info.append(f"Method 1 failed: {e1}")
+                
+                # Method 2: Try a different approach - get user info first
+                try:
+                    debug_info.append("Attempting to get user info for queue...")
+                    user_info = await app.get_users(user_id)
+                    debug_info.append(f"User info: {type(user_info)}")
+                    
+                    if user_info and hasattr(user_info, 'photo') and user_info.photo:
+                        debug_info.append(f"User has photo: {type(user_info.photo)}")
+                        try:
+                            photo_file = await app.download_media(
+                                user_info.photo.big_file_id if hasattr(user_info.photo, 'big_file_id') else user_info.photo,
+                                file_name=f"cache/user_{user_id}_queue.jpg"
+                            )
+                            if photo_file and os.path.exists(photo_file):
+                                wxy = photo_file
+                                debug_info.append(f"SUCCESS: Downloaded user photo via user info to {photo_file}")
+                            else:
+                                raise Exception("User info photo download failed")
+                        except Exception as download_err:
+                            debug_info.append(f"User info photo download error: {download_err}")
+                            raise Exception("User info method failed")
+                    else:
+                        raise Exception("User has no photo in user info")
+                        
                 except Exception as e2:
-                    print(f"Method 2 failed for queue: {e2}")
+                    debug_info.append(f"Method 2 failed: {e2}")
                     raise Exception("All user photo methods failed")
                     
         except Exception as e:
-            print(f"Failed to get user profile photo for queue: {e}")
+            debug_info.append(f"All user methods failed: {e}")
+            
+            # Fallback to bot's profile photo
             try:
-                # Fallback to bot's profile photo
+                debug_info.append("Attempting bot profile photo fallback for queue...")
                 bot_photos = await app.get_profile_photos(app.id)
-                if bot_photos and bot_photos.total_count > 0:
+                if bot_photos and hasattr(bot_photos, 'total_count') and bot_photos.total_count > 0:
                     first_photo = bot_photos.photos[0]
-                    
-                    photo_file = None
-                    if hasattr(first_photo, 'file_id'):
-                        photo_file = await app.download_media(
-                            first_photo.file_id, 
-                            file_name=f"cache/bot_{app.id}_queue.jpg"
-                        )
-                    elif isinstance(first_photo, list) and len(first_photo) > 0:
-                        for size_photo in reversed(first_photo):
-                            try:
-                                if hasattr(size_photo, 'file_id'):
-                                    photo_file = await app.download_media(
-                                        size_photo.file_id, 
-                                        file_name=f"cache/bot_{app.id}_queue.jpg"
-                                    )
-                                    break
-                                else:
-                                    photo_file = await app.download_media(
-                                        size_photo, 
-                                        file_name=f"cache/bot_{app.id}_queue.jpg"
-                                    )
-                                    break
-                            except Exception:
-                                continue
-                    else:
-                        photo_file = await app.download_media(
-                            first_photo, 
-                            file_name=f"cache/bot_{app.id}_queue.jpg"
-                        )
-                    
+                    photo_file = await app.download_media(
+                        first_photo, 
+                        file_name=f"cache/bot_{app.id}_queue.jpg"
+                    )
                     if photo_file and os.path.exists(photo_file):
                         wxy = photo_file
-                        print(f"Using bot profile photo as fallback for queue")
+                        debug_info.append(f"SUCCESS: Using bot profile photo {photo_file}")
                     else:
                         raise Exception("Bot photo download failed")
                 else:
                     raise Exception("Bot has no profile photos")
             except Exception as e2:
-                print(f"Failed to get bot profile photo for queue: {e2}")
-                # Create a default profile image - improved design
+                debug_info.append(f"Bot fallback failed: {e2}")
+                
+                # Final fallback: create default image
                 default_img = Image.new("RGB", (640, 640), color="#2C3E50")
                 draw = ImageDraw.Draw(default_img)
                 
@@ -639,7 +571,11 @@ async def gen_qthumb(videoid, user_id):
                 
                 wxy = f"cache/default_{user_id}_queue.jpg"
                 default_img.save(wxy)
-                print(f"Created enhanced default profile image for queue at {wxy}")
+                debug_info.append(f"Created default profile image at {wxy}")
+        
+        # Print all debug info
+        for info in debug_info:
+            print(f"PFP DEBUG QUEUE: {info}")
         
         # Process the profile image to make it circular - robust approach
         try:
