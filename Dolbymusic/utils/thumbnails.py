@@ -41,18 +41,23 @@ async def gen_thumb(videoid, user_id):
     url = f"https://www.youtube.com/watch?v={videoid}"
     try:
         results = VideosSearch(url, limit=1)
-        for result in (await results.next())["result"]:
+        search_results = await results.next()
+        
+        for result in search_results["result"]:
             try:
                 title = result["title"]
                 title = re.sub("\W+", " ", title)
                 title = title.title()
-            except:
+            except Exception:
                 title = "Unsupported Title"
             try:
                 duration = result["duration"]
-            except:
+            except Exception:
                 duration = "Unknown"
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
+            try:
+                thumbnail = result["thumbnails"][0]["url"].split("?")[0]
+            except Exception:
+                thumbnail = None
             try:
                 result["viewCount"]["short"]
             except:
@@ -72,60 +77,110 @@ async def gen_thumb(videoid, user_id):
         try:
             wxyz = await app.get_profile_photos(user_id)
             wxy = await app.download_media(wxyz[0]['file_id'], file_name=f'{user_id}.jpg')
-        except:
-            hehe = await app.get_profile_photos(app.id)
-            wxy = await app.download_media(hehe[0]['file_id'], file_name=f'{app.id}.jpg')
-        xy = Image.open(wxy)
-        a = Image.new('L', [640, 640], 0)
-        b = ImageDraw.Draw(a)
-        b.pieslice([(0, 0), (640,640)], 0, 360, fill = 255, outline = "white")
-        c = np.array(xy)
-        d = np.array(a)
-        e = np.dstack((c, d))
-        f = Image.fromarray(e)
-        x = f.resize((107, 107))
+        except Exception:
+            try:
+                hehe = await app.get_profile_photos(app.id)
+                wxy = await app.download_media(hehe[0]['file_id'], file_name=f'{app.id}.jpg')
+            except Exception:
+                # Create a default profile image
+                default_img = Image.new("RGB", (640, 640), color="blue")
+                wxy = f"cache/default_{user_id}.jpg"
+                default_img.save(wxy)
+        
+        try:
+            xy = Image.open(wxy)
+            a = Image.new('L', [640, 640], 0)
+            b = ImageDraw.Draw(a)
+            b.pieslice([(0, 0), (640,640)], 0, 360, fill = 255, outline = "white")
+            c = np.array(xy)
+            d = np.array(a)
+            e = np.dstack((c, d))
+            f = Image.fromarray(e)
+            x = f.resize((107, 107))
+        except Exception:
+            # Create a default circular profile image
+            x = Image.new("RGB", (107, 107), color="blue")
 
-        youtube = Image.open(f"cache/thumb{videoid}.png")
-        bg = Image.open(f"Dolbymusic/assets/anonx.png")
-        image1 = changeImageSize(1280, 720, youtube)
-        image2 = image1.convert("RGBA")
-        background = image2.filter(filter=ImageFilter.BoxBlur(30))
-        enhancer = ImageEnhance.Brightness(background)
-        background = enhancer.enhance(0.6)
+        try:
+            youtube = Image.open(f"cache/thumb{videoid}.png")
+            bg_path = "Dolbymusic/assets/anonx.png"
+            if os.path.exists(bg_path):
+                bg = Image.open(bg_path)
+            else:
+                bg = Image.new("RGBA", (1280, 720), color=(0, 0, 0, 180))
+        except Exception:
+            # Create fallback images
+            youtube = Image.new("RGB", (480, 360), color="gray")
+            bg = Image.new("RGBA", (1280, 720), color=(0, 0, 0, 180))
 
-        image3 = changeImageSize(1280, 720, bg)
-        image5 = image3.convert("RGBA")
-        Image.alpha_composite(background, image5).save(f"cache/temp{videoid}.png")
+        try:
+            image1 = changeImageSize(1280, 720, youtube)
+            image2 = image1.convert("RGBA")
+            background = image2.filter(filter=ImageFilter.BoxBlur(30))
+            enhancer = ImageEnhance.Brightness(background)
+            background = enhancer.enhance(0.6)
 
-        Xcenter = youtube.width / 2
-        Ycenter = youtube.height / 2
-        x1 = Xcenter - 250
-        y1 = Ycenter - 250
-        x2 = Xcenter + 250
-        y2 = Ycenter + 250
-        logo = youtube.crop((x1, y1, x2, y2))
-        logo.thumbnail((520, 520), Image.LANCZOS)
-        logo.save(f"cache/chop{videoid}.png")
-        if not os.path.isfile(f"cache/cropped{videoid}.png"):
-            im = Image.open(f"cache/chop{videoid}.png").convert("RGBA")
-            add_corners(im)
-            im.save(f"cache/cropped{videoid}.png")
+            image3 = changeImageSize(1280, 720, bg)
+            image5 = image3.convert("RGBA")
+            composite = Image.alpha_composite(background, image5)
+            composite.save(f"cache/temp{videoid}.png")
+        except Exception:
+            # Create a fallback composite
+            fallback = Image.new("RGBA", (1280, 720), color=(50, 50, 50, 255))
+            fallback.save(f"cache/temp{videoid}.png")
 
-        crop_img = Image.open(f"cache/cropped{videoid}.png")
-        logo = crop_img.convert("RGBA")
-        logo.thumbnail((365, 365), Image.LANCZOS)
-        width = int((1280 - 365) / 2)
-        background = Image.open(f"cache/temp{videoid}.png")
-        background.paste(logo, (width + 2, 138), mask=logo)
-        background.paste(x, (710, 427), mask=x)
-        background.paste(image3, (0, 0), mask=image3)
+        try:
+            Xcenter = youtube.width / 2
+            Ycenter = youtube.height / 2
+            x1 = Xcenter - 250
+            y1 = Ycenter - 250
+            x2 = Xcenter + 250
+            y2 = Ycenter + 250
+            logo = youtube.crop((x1, y1, x2, y2))
+            logo.thumbnail((520, 520), Image.LANCZOS)
+            logo.save(f"cache/chop{videoid}.png")
+            
+            if not os.path.isfile(f"cache/cropped{videoid}.png"):
+                im = Image.open(f"cache/chop{videoid}.png").convert("RGBA")
+                add_corners(im)
+                im.save(f"cache/cropped{videoid}.png")
+        except Exception:
+            # Create a fallback cropped image
+            fallback_crop = Image.new("RGBA", (365, 365), color=(100, 100, 100, 255))
+            fallback_crop.save(f"cache/cropped{videoid}.png")
 
-        draw = ImageDraw.Draw(background)
-        font = ImageFont.truetype("Dolbymusic/assets/font2.ttf", 45)
-        ImageFont.truetype("Dolbymusic/assets/font2.ttf", 70)
-        arial = ImageFont.truetype("Dolbymusic/assets/font2.ttf", 30)
-        ImageFont.truetype("Dolbymusic/assets/font.ttf", 30)
-        para = textwrap.wrap(title, width=32)
+        try:
+            crop_img = Image.open(f"cache/cropped{videoid}.png")
+            logo = crop_img.convert("RGBA")
+            logo.thumbnail((365, 365), Image.LANCZOS)
+            width = int((1280 - 365) / 2)
+            background = Image.open(f"cache/temp{videoid}.png")
+            background.paste(logo, (width + 2, 138), mask=logo)
+            background.paste(x, (710, 427), mask=x)
+            background.paste(image3, (0, 0), mask=image3)
+        except Exception:
+            # Create a fallback background
+            background = Image.new("RGBA", (1280, 720), color=(80, 80, 80, 255))
+
+        try:
+            draw = ImageDraw.Draw(background)
+            font_path = "Dolbymusic/assets/font2.ttf"
+            if os.path.exists(font_path):
+                font = ImageFont.truetype(font_path, 45)
+                arial = ImageFont.truetype(font_path, 30)
+            else:
+                font = ImageFont.load_default()
+                arial = ImageFont.load_default()
+        except Exception:
+            # Use default fonts
+            font = ImageFont.load_default()
+            arial = ImageFont.load_default()
+        
+        try:
+            para = textwrap.wrap(title, width=32)
+        except Exception:
+            para = ["Unknown Title"]
+        
         try:
             draw.text(
                 (450, 25),
@@ -135,6 +190,7 @@ async def gen_thumb(videoid, user_id):
                 stroke_fill="grey",
                 font=font,
             )
+            
             if len(para) > 0 and para[0]:
                 bbox = draw.textbbox((0, 0), f"{para[0]}", font=font)
                 text_w = bbox[2] - bbox[0]
@@ -146,6 +202,7 @@ async def gen_thumb(videoid, user_id):
                     stroke_fill="white",
                     font=font,
                 )
+                
             if len(para) > 1 and para[1]:
                 bbox = draw.textbbox((0, 0), f"{para[1]}", font=font)
                 text_w = bbox[2] - bbox[0]
@@ -157,22 +214,31 @@ async def gen_thumb(videoid, user_id):
                     stroke_fill="white",
                     font=font,
                 )
-        except:
+        except Exception:
             pass
-        bbox = draw.textbbox((0, 0), f"Duration: {duration} Mins", font=arial)
-        text_w = bbox[2] - bbox[0]
-        draw.text(
-            ((1280 - text_w) / 2, 660),
-            f"Duration: {duration} Mins",
-            fill="white",
-            font=arial,
-        )
+            
+        try:
+            bbox = draw.textbbox((0, 0), f"Duration: {duration} Mins", font=arial)
+            text_w = bbox[2] - bbox[0]
+            draw.text(
+                ((1280 - text_w) / 2, 660),
+                f"Duration: {duration} Mins",
+                fill="white",
+                font=arial,
+            )
+        except Exception:
+            pass
+            
         try:
             os.remove(f"cache/thumb{videoid}.png")
         except:
             pass
-        background.save(f"cache/{videoid}_{user_id}.png")
-        return f"cache/{videoid}_{user_id}.png"
+            
+        try:
+            background.save(f"cache/{videoid}_{user_id}.png")
+            return f"cache/{videoid}_{user_id}.png"
+        except Exception:
+            return YOUTUBE_IMG_URL
     except Exception as e:
         print(e)
         return YOUTUBE_IMG_URL
@@ -192,13 +258,16 @@ async def gen_qthumb(videoid, user_id):
                 title = result["title"]
                 title = re.sub("\W+", " ", title)
                 title = title.title()
-            except:
+            except Exception:
                 title = "Unsupported Title"
             try:
                 duration = result["duration"]
-            except:
+            except Exception:
                 duration = "Unknown"
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
+            try:
+                thumbnail = result["thumbnails"][0]["url"].split("?")[0]
+            except Exception:
+                thumbnail = None
             try:
                 result["viewCount"]["short"]
             except:
