@@ -287,13 +287,6 @@ import re
 from typing import Union
 from urllib.parse import urlparse, parse_qs
 
-from pyrogram.enums import MessageEntityType
-from pyrogram.types import Message
-from youtubesearchpython.__future__ import VideosSearch
-
-from Dolbymusic.utils.database import is_on_off
-from Dolbymusic.utils.formatters import time_to_seconds
-
 from pytubefix import YouTube, Playlist
 
 import functools
@@ -324,36 +317,8 @@ class YouTubeAPI:
         self.listbase = "https://youtube.com/playlist?list="
         self.reg = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
-    async def exists(self, link: str, videoid: Union[bool, str] = None):
-        if videoid:
-            link = self.base + link
-        return bool(re.search(self.regex, link))
-
-    async def url(self, message_1: Message) -> Union[str, None]:
-        messages = [message_1]
-        if message_1.reply_to_message:
-            messages.append(message_1.reply_to_message)
-        text = ""
-        offset = None
-        length = None
-        for message in messages:
-            if offset:
-                break
-            if message.entities:
-                for entity in message.entities:
-                    if entity.type == MessageEntityType.URL:
-                        text = message.text or message.caption
-                        offset, length = entity.offset, entity.length
-                        break
-            elif message.caption_entities:
-                for entity in message.caption_entities:
-                    if entity.type == MessageEntityType.TEXT_LINK:
-                        return entity.url
-        if offset is None:
-            return None
-        return text[offset : offset + length]
-
     async def details(self, link: str, videoid: Union[bool, str] = None):
+        """Returns a dict with details or None if failed."""
         if videoid:
             link = self.base + link
         if "&" in link:
@@ -365,10 +330,16 @@ class YouTubeAPI:
             duration_min = f"{duration_sec // 60}:{duration_sec % 60:02d}"
             thumbnail = yt.thumbnail_url
             vidid = yt.video_id
-            return title, duration_min, duration_sec, thumbnail, vidid
+            return {
+                "title": title,
+                "duration_min": duration_min,
+                "duration_sec": duration_sec,
+                "thumbnail": thumbnail,
+                "vidid": vidid
+            }
         except Exception as e:
             print(f"Failed to fetch details: {e}")
-            return None, None, None, None, None
+            return None
 
     async def title(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
@@ -377,8 +348,7 @@ class YouTubeAPI:
             link = link.split("&")[0]
         try:
             yt = YouTube(link)
-            title = yt.title
-            return title
+            return yt.title
         except Exception as e:
             print(f"Failed to fetch title: {e}")
             return None
@@ -404,14 +374,12 @@ class YouTubeAPI:
             link = link.split("&")[0]
         try:
             yt = YouTube(link)
-            thumbnail = yt.thumbnail_url
-            return thumbnail
+            return yt.thumbnail_url
         except Exception as e:
             print(f"Failed to fetch thumbnail: {e}")
             return None
 
     async def video(self, link: str, videoid: Union[bool, str] = None):
-        # Extract YouTube video ID
         if videoid:
             link = self.base + link
         if "&" in link:
@@ -470,7 +438,6 @@ class YouTubeAPI:
             return None, None
 
     async def formats(self, link: str, videoid: Union[bool, str] = None):
-        # Use pytubefix to get available streams
         if videoid:
             link = self.base + link
         if "&" in link:
@@ -482,7 +449,7 @@ class YouTubeAPI:
         elif url_data.hostname == "youtu.be":
             video_id = url_data.path[1:]
         else:
-            video_id = link  # fallback
+            video_id = link
 
         try:
             yt = YouTube(f"https://www.youtube.com/watch?v={video_id}")
@@ -503,24 +470,6 @@ class YouTubeAPI:
             print(f"Failed to fetch formats: {e}")
             return [], None
 
-    async def slider(
-        self,
-        link: str,
-        query_type: int,
-        videoid: Union[bool, str] = None,
-    ):
-        if videoid:
-            link = self.base + link
-        if "&" in link:
-            link = link.split("&")[0]
-        a = VideosSearch(link, limit=10)
-        result = (await a.next()).get("result")
-        title = result[query_type]["title"]
-        duration_min = result[query_type]["duration"]
-        vidid = result[query_type]["id"]
-        thumbnail = result[query_type]["thumbnails"][0]["url"].split("?")[0]
-        return title, duration_min, thumbnail, vidid
-
     async def download(
         self,
         link: str,
@@ -532,7 +481,6 @@ class YouTubeAPI:
         format_id: Union[bool, str] = None,
         title: Union[bool, str] = None,
     ) -> str:
-        # Extract YouTube video ID
         if videoid:
             link = self.base + link
         if "&" in link:
@@ -544,12 +492,12 @@ class YouTubeAPI:
         elif url_data.hostname == "youtu.be":
             video_id = url_data.path[1:]
         else:
-            video_id = link  # fallback
+            video_id = link
 
         if songvideo:
             file_path = await get_file_with_pytubefix(video_id, audio=False)
             return file_path, True
-        elif songaudio or not video:  # Default to audio if not video
+        elif songaudio or not video:
             file_path = await get_file_with_pytubefix(video_id, audio=True)
             return file_path, True
         elif video:
