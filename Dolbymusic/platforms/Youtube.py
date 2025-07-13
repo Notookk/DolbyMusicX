@@ -358,47 +358,57 @@ class YouTubeAPI:
             link = self.base + link
         if "&" in link:
             link = link.split("&")[0]
-        results = VideosSearch(link, limit=1)
-        for result in (await results.next())["result"]:
-            title = result["title"]
-            duration_min = result["duration"]
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-            vidid = result["id"]
-            if str(duration_min) == "None":
-                duration_sec = 0
-            else:
-                duration_sec = int(time_to_seconds(duration_min))
-        return title, duration_min, duration_sec, thumbnail, vidid
+        try:
+            yt = YouTube(link)
+            title = yt.title
+            duration_sec = yt.length
+            duration_min = f"{duration_sec // 60}:{duration_sec % 60:02d}"
+            thumbnail = yt.thumbnail_url
+            vidid = yt.video_id
+            return title, duration_min, duration_sec, thumbnail, vidid
+        except Exception as e:
+            print(f"Failed to fetch details: {e}")
+            return None, None, None, None, None
 
     async def title(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + link
         if "&" in link:
             link = link.split("&")[0]
-        results = VideosSearch(link, limit=1)
-        for result in (await results.next())["result"]:
-            title = result["title"]
-        return title
+        try:
+            yt = YouTube(link)
+            title = yt.title
+            return title
+        except Exception as e:
+            print(f"Failed to fetch title: {e}")
+            return None
 
     async def duration(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + link
         if "&" in link:
             link = link.split("&")[0]
-        results = VideosSearch(link, limit=1)
-        for result in (await results.next())["result"]:
-            duration = result["duration"]
-        return duration
+        try:
+            yt = YouTube(link)
+            duration_sec = yt.length
+            duration_min = f"{duration_sec // 60}:{duration_sec % 60:02d}"
+            return duration_min
+        except Exception as e:
+            print(f"Failed to fetch duration: {e}")
+            return None
 
     async def thumbnail(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + link
         if "&" in link:
             link = link.split("&")[0]
-        results = VideosSearch(link, limit=1)
-        for result in (await results.next())["result"]:
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-        return thumbnail
+        try:
+            yt = YouTube(link)
+            thumbnail = yt.thumbnail_url
+            return thumbnail
+        except Exception as e:
+            print(f"Failed to fetch thumbnail: {e}")
+            return None
 
     async def video(self, link: str, videoid: Union[bool, str] = None):
         # Extract YouTube video ID
@@ -426,31 +436,38 @@ class YouTubeAPI:
             link = self.listbase + link
         if "&" in link:
             link = link.split("&")[0]
-        # Use pytubefix.Playlist to extract video IDs
-        pl = Playlist(link)
-        ids = [video.video_id for video in pl.videos[:limit]]
-        return ids
+        try:
+            pl = Playlist(link)
+            ids = [video.video_id for video in pl.videos[:limit]]
+            return ids
+        except Exception as e:
+            print(f"Failed to fetch playlist: {e}")
+            return []
 
     async def track(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + link
         if "&" in link:
             link = link.split("&")[0]
-        results = VideosSearch(link, limit=1)
-        for result in (await results.next())["result"]:
-            title = result["title"]
-            duration_min = result["duration"]
-            vidid = result["id"]
-            yturl = result["link"]
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-        track_details = {
-            "title": title,
-            "link": yturl,
-            "vidid": vidid,
-            "duration_min": duration_min,
-            "thumb": thumbnail,
-        }
-        return track_details, vidid
+        try:
+            yt = YouTube(link)
+            title = yt.title
+            duration_sec = yt.length
+            duration_min = f"{duration_sec // 60}:{duration_sec % 60:02d}"
+            vidid = yt.video_id
+            yturl = yt.watch_url
+            thumbnail = yt.thumbnail_url
+            track_details = {
+                "title": title,
+                "link": yturl,
+                "vidid": vidid,
+                "duration_min": duration_min,
+                "thumb": thumbnail,
+            }
+            return track_details, vidid
+        except Exception as e:
+            print(f"Failed to fetch track: {e}")
+            return None, None
 
     async def formats(self, link: str, videoid: Union[bool, str] = None):
         # Use pytubefix to get available streams
@@ -467,20 +484,24 @@ class YouTubeAPI:
         else:
             video_id = link  # fallback
 
-        yt = YouTube(f"https://www.youtube.com/watch?v={video_id}")
-        formats_available = []
-        for stream in yt.streams:
-            formats_available.append({
-                "itag": stream.itag,
-                "mime_type": stream.mime_type,
-                "abr": getattr(stream, "abr", None),
-                "resolution": getattr(stream, "resolution", None),
-                "type": "audio" if stream.only_audio else "video",
-                "ext": stream.subtype,
-                "filesize": stream.filesize,
-                "yturl": yt.watch_url,
-            })
-        return formats_available, yt.watch_url
+        try:
+            yt = YouTube(f"https://www.youtube.com/watch?v={video_id}")
+            formats_available = []
+            for stream in yt.streams:
+                formats_available.append({
+                    "itag": stream.itag,
+                    "mime_type": stream.mime_type,
+                    "abr": getattr(stream, "abr", None),
+                    "resolution": getattr(stream, "resolution", None),
+                    "type": "audio" if stream.only_audio else "video",
+                    "ext": stream.subtype,
+                    "filesize": stream.filesize,
+                    "yturl": yt.watch_url,
+                })
+            return formats_available, yt.watch_url
+        except Exception as e:
+            print(f"Failed to fetch formats: {e}")
+            return [], None
 
     async def slider(
         self,
