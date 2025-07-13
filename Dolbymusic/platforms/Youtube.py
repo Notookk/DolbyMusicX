@@ -319,7 +319,6 @@ class YouTubeAPI:
 
     async def url(self, message_1) -> Union[str, None]:
         messages = [message_1]
-        # Support for Pyrogram Message object
         if hasattr(message_1, "reply_to_message") and message_1.reply_to_message:
             messages.append(message_1.reply_to_message)
         text = ""
@@ -330,7 +329,6 @@ class YouTubeAPI:
                 break
             if hasattr(message, "entities") and message.entities:
                 for entity in message.entities:
-                    # Pyrogram v2: entity.type is an enum, else string
                     if getattr(entity.type, "name", entity.type) == "URL":
                         text = getattr(message, "text", None) or getattr(message, "caption", None)
                         offset, length = entity.offset, entity.length
@@ -344,7 +342,11 @@ class YouTubeAPI:
         return text[offset : offset + length]
 
     async def details(self, link: str, videoid: Union[bool, str] = None):
-        """Returns a dict with details or None if failed."""
+        """
+        Returns a dict with details. Always returns a dict with keys:
+        "title", "duration_min", "duration_sec", "thumbnail", "vidid".
+        If fetching fails, values are None.
+        """
         if videoid:
             link = self.base + link
         if "&" in link:
@@ -365,7 +367,13 @@ class YouTubeAPI:
             }
         except Exception as e:
             print(f"Failed to fetch details: {e}")
-            return None
+            return {
+                "title": None,
+                "duration_min": None,
+                "duration_sec": None,
+                "thumbnail": None,
+                "vidid": None
+            }
 
     async def title(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
@@ -417,12 +425,12 @@ class YouTubeAPI:
         elif url_data.hostname == "youtu.be":
             video_id = url_data.path[1:]
         else:
-            video_id = link  # fallback
-
-        file_path = await get_file_with_pytubefix(video_id, audio=False)
-        if file_path:
+            video_id = link
+        try:
+            file_path = await get_file_with_pytubefix(video_id, audio=False)
             return 1, file_path
-        else:
+        except Exception as e:
+            print(f"Failed to download video: {e}")
             return 0, "Download failed"
 
     async def playlist(self, link, limit, user_id, videoid: Union[bool, str] = None):
@@ -461,7 +469,13 @@ class YouTubeAPI:
             return track_details, vidid
         except Exception as e:
             print(f"Failed to fetch track: {e}")
-            return None, None
+            return {
+                "title": None,
+                "link": None,
+                "vidid": None,
+                "duration_min": None,
+                "thumb": None
+            }, None
 
     async def formats(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
@@ -476,7 +490,6 @@ class YouTubeAPI:
             video_id = url_data.path[1:]
         else:
             video_id = link
-
         try:
             yt = YouTube(f"https://www.youtube.com/watch?v={video_id}")
             formats_available = []
@@ -519,16 +532,19 @@ class YouTubeAPI:
             video_id = url_data.path[1:]
         else:
             video_id = link
-
-        if songvideo:
-            file_path = await get_file_with_pytubefix(video_id, audio=False)
-            return file_path, True
-        elif songaudio or not video:
-            file_path = await get_file_with_pytubefix(video_id, audio=True)
-            return file_path, True
-        elif video:
-            file_path = await get_file_with_pytubefix(video_id, audio=False)
-            return file_path, True
-        else:
-            file_path = await get_file_with_pytubefix(video_id, audio=True)
-            return file_path, True
+        try:
+            if songvideo:
+                file_path = await get_file_with_pytubefix(video_id, audio=False)
+                return file_path, True
+            elif songaudio or not video:
+                file_path = await get_file_with_pytubefix(video_id, audio=True)
+                return file_path, True
+            elif video:
+                file_path = await get_file_with_pytubefix(video_id, audio=False)
+                return file_path, True
+            else:
+                file_path = await get_file_with_pytubefix(video_id, audio=True)
+                return file_path, True
+        except Exception as e:
+            print(f"Failed to download: {e}")
+            return None, False
