@@ -317,6 +317,32 @@ class YouTubeAPI:
         self.listbase = "https://youtube.com/playlist?list="
         self.reg = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
+    async def url(self, message_1) -> Union[str, None]:
+        messages = [message_1]
+        # Support for Pyrogram Message object
+        if hasattr(message_1, "reply_to_message") and message_1.reply_to_message:
+            messages.append(message_1.reply_to_message)
+        text = ""
+        offset = None
+        length = None
+        for message in messages:
+            if offset:
+                break
+            if hasattr(message, "entities") and message.entities:
+                for entity in message.entities:
+                    # Pyrogram v2: entity.type is an enum, else string
+                    if getattr(entity.type, "name", entity.type) == "URL":
+                        text = getattr(message, "text", None) or getattr(message, "caption", None)
+                        offset, length = entity.offset, entity.length
+                        break
+            elif hasattr(message, "caption_entities") and message.caption_entities:
+                for entity in message.caption_entities:
+                    if getattr(entity.type, "name", entity.type) == "TEXT_LINK":
+                        return entity.url
+        if offset is None:
+            return None
+        return text[offset : offset + length]
+
     async def details(self, link: str, videoid: Union[bool, str] = None):
         """Returns a dict with details or None if failed."""
         if videoid:
