@@ -294,8 +294,7 @@ from youtubesearchpython.__future__ import VideosSearch
 from Dolbymusic.utils.database import is_on_off
 from Dolbymusic.utils.formatters import time_to_seconds
 
-from pytubefix import YouTube
-from youtube_playlist import Playlist  # pip install youtube-playlist
+from pytubefix import YouTube, Playlist
 
 import functools
 
@@ -427,9 +426,9 @@ class YouTubeAPI:
             link = self.listbase + link
         if "&" in link:
             link = link.split("&")[0]
-        # Use youtube-playlist to extract video IDs
+        # Use pytubefix.Playlist to extract video IDs
         pl = Playlist(link)
-        ids = [video['id'] for video in pl.videos[:limit]]
+        ids = [video.video_id for video in pl.videos[:limit]]
         return ids
 
     async def track(self, link: str, videoid: Union[bool, str] = None):
