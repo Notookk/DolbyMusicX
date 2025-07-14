@@ -327,6 +327,38 @@ class YouTubeAPI:
             link = self.base + str(link)
         return is_youtube_url(link)
 
+    async def url(self, message_1) -> Union[str, None]:
+        messages = [message_1]
+        if hasattr(message_1, "reply_to_message") and getattr(message_1, "reply_to_message", None):
+            messages.append(message_1.reply_to_message)
+        text = ""
+        offset = None
+        length = None
+        for message in messages:
+            entities = getattr(message, "entities", None) or []
+            caption_entities = getattr(message, "caption_entities", None) or []
+            if offset:
+                break
+            if entities:
+                for entity in entities:
+                    etype = getattr(entity, "type", None)
+                    if hasattr(etype, "name"):
+                        etype = etype.name
+                    if etype == "URL":
+                        text = getattr(message, "text", None) or getattr(message, "caption", None) or ""
+                        offset, length = entity.offset, entity.length
+                        break
+            if caption_entities:
+                for entity in caption_entities:
+                    etype = getattr(entity, "type", None)
+                    if hasattr(etype, "name"):
+                        etype = etype.name
+                    if etype == "TEXT_LINK":
+                        return getattr(entity, "url", None)
+        if offset is None or not text:
+            return None
+        return text[offset : offset + length]
+
     async def details(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + str(link)
