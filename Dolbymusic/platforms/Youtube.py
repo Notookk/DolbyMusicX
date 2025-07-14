@@ -288,8 +288,15 @@ from typing import Union
 from urllib.parse import urlparse, parse_qs
 
 from pytubefix import YouTube, Playlist
-
 import functools
+
+# Strict YouTube URL detection regex
+YOUTUBE_URL_RE = re.compile(
+    r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+$'
+)
+
+def is_youtube_url(text: str) -> bool:
+    return bool(YOUTUBE_URL_RE.match(text.strip()))
 
 async def get_file_with_pytubefix(video_id, audio=True):
     loop = asyncio.get_event_loop()
@@ -316,6 +323,11 @@ class YouTubeAPI:
         self.status = "https://www.youtube.com/oembed?url="
         self.listbase = "https://youtube.com/playlist?list="
         self.reg = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+    async def exists(self, link: str, videoid: Union[bool, str] = None):
+        if videoid:
+            link = self.base + link
+        return is_youtube_url(link)
 
     async def url(self, message_1) -> Union[str, None]:
         messages = [message_1]
@@ -375,6 +387,81 @@ class YouTubeAPI:
                 "vidid": None
             }
 
+    # The key fix: handle search vs URL for track
+    async def track(self, query: str, videoid: Union[bool, str] = None):
+        """
+        If the query is a YouTube URL or video ID, treat as link. Otherwise, treat as search query.
+        """
+        if videoid:
+            link = self.base + query
+        elif is_youtube_url(query):
+            link = query
+        else:
+            # Use youtubesearchpython for search
+            try:
+                from youtubesearchpython.__future__ import VideosSearch
+                search = VideosSearch(query, limit=1)
+                results = await search.next()
+                if not results["result"]:
+                    raise Exception("No YouTube results found")
+                first = results["result"][0]
+                link = first["link"]
+            except Exception as e:
+                print(f"Failed to search YouTube: {e}")
+                return {
+                    "title": None,
+                    "link": None,
+                    "vidid": None,
+                    "duration_min": None,
+                    "thumb": None
+                }, None
+        # Now fetch details
+        details = await self.details(link)
+        if details is None or details["vidid"] is None:
+            return {
+                "title": None,
+                "link": None,
+                "vidid": None,
+                "duration_min": None,
+                "thumb": None
+            }, None
+        # Add 'thumb' and 'link' key for compatibility
+        details["thumb"] = details["thumbnail"]
+        details["link"] = link
+        return details, details["vidid"]
+
+    async def playlist(self, link, limit, user_id, videoid: Union[bool, str] = None):
+        if videoid:
+            link = self.listbase + link
+        if "&" in link:
+            link = link.split("&")[0]
+        try:
+            pl = Playlist(link)
+            ids = [video.video_id for video in pl.videos[:limit]]
+            return ids
+        except Exception as e:
+            print(f"Failed to fetch playlist: {e}")
+            return []
+
+    async def slider(self, query: str, query_type: int, videoid: Union[bool, str] = None):
+        # Always treat as search for slider
+        try:
+            from youtubesearchpython.__future__ import VideosSearch
+            search = VideosSearch(query, limit=10)
+            results = await search.next()
+            if not results["result"]:
+                raise Exception("No YouTube results found")
+            result = results["result"]
+            first = result[query_type]
+            title = first["title"]
+            duration_min = first["duration"]
+            vidid = first["id"]
+            thumbnail = first["thumbnails"][0]["url"].split("?")[0]
+            return title, duration_min, thumbnail, vidid
+        except Exception as e:
+            print(f"Failed to slider-search YouTube: {e}")
+            return None, None, None, None
+
     async def title(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + link
@@ -432,50 +519,6 @@ class YouTubeAPI:
         except Exception as e:
             print(f"Failed to download video: {e}")
             return 0, "Download failed"
-
-    async def playlist(self, link, limit, user_id, videoid: Union[bool, str] = None):
-        if videoid:
-            link = self.listbase + link
-        if "&" in link:
-            link = link.split("&")[0]
-        try:
-            pl = Playlist(link)
-            ids = [video.video_id for video in pl.videos[:limit]]
-            return ids
-        except Exception as e:
-            print(f"Failed to fetch playlist: {e}")
-            return []
-
-    async def track(self, link: str, videoid: Union[bool, str] = None):
-        if videoid:
-            link = self.base + link
-        if "&" in link:
-            link = link.split("&")[0]
-        try:
-            yt = YouTube(link)
-            title = yt.title
-            duration_sec = yt.length
-            duration_min = f"{duration_sec // 60}:{duration_sec % 60:02d}"
-            vidid = yt.video_id
-            yturl = yt.watch_url
-            thumbnail = yt.thumbnail_url
-            track_details = {
-                "title": title,
-                "link": yturl,
-                "vidid": vidid,
-                "duration_min": duration_min,
-                "thumb": thumbnail,
-            }
-            return track_details, vidid
-        except Exception as e:
-            print(f"Failed to fetch track: {e}")
-            return {
-                "title": None,
-                "link": None,
-                "vidid": None,
-                "duration_min": None,
-                "thumb": None
-            }, None
 
     async def formats(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
