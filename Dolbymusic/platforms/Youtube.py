@@ -289,11 +289,9 @@ from urllib.parse import urlparse, parse_qs
 from pytubefix import YouTube, Playlist
 import functools
 
-# Strict YouTube URL detection regex
 YOUTUBE_URL_RE = re.compile(
     r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+$'
 )
-
 def is_youtube_url(text: str) -> bool:
     if not isinstance(text, str):
         return False
@@ -363,11 +361,6 @@ class YouTubeAPI:
         return text[offset : offset + length]
 
     async def details(self, link: str, videoid: Union[bool, str] = None):
-        """
-        Returns a dict with details. Always returns a dict with keys:
-        "title", "duration_min", "duration_sec", "thumbnail", "vidid".
-        If fetching fails, values are None.
-        """
         if videoid:
             link = self.base + str(link)
         if not link or not isinstance(link, str):
@@ -408,10 +401,6 @@ class YouTubeAPI:
             }
 
     async def track(self, query: str, videoid: Union[bool, str] = None):
-        """
-        If the query is a YouTube URL or video ID, treat as link. Otherwise, treat as search query.
-        Always returns (details_dict, vidid)
-        """
         link = None
         if videoid:
             link = self.base + str(query)
@@ -435,7 +424,6 @@ class YouTubeAPI:
                     "duration_min": None,
                     "thumb": None
                 }, None
-        # Now fetch details
         details = await self.details(link)
         if not details or not details.get("vidid"):
             return {
@@ -445,7 +433,6 @@ class YouTubeAPI:
                 "duration_min": None,
                 "thumb": None
             }, None
-        # Add 'thumb' and 'link' key for compatibility
         details["thumb"] = details.get("thumbnail")
         details["link"] = link
         return details, details["vidid"]
