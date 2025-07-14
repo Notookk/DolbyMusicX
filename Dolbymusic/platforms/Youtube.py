@@ -281,12 +281,10 @@
 
 
 
-import asyncio
-import os
 import re
 from typing import Union
-from urllib.parse import urlparse, parse_qs
 from pytubefix import YouTube, Playlist
+import asyncio
 import functools
 
 YOUTUBE_URL_RE = re.compile(
@@ -304,6 +302,7 @@ async def get_file_with_pytubefix(video_id, audio=True):
 def sync_download(video_id, audio=True):
     url = f"https://www.youtube.com/watch?v={video_id}"
     yt = YouTube(url)
+    import os
     os.makedirs("downloads", exist_ok=True)
     if audio:
         stream = yt.streams.filter(only_audio=True).first()
@@ -516,6 +515,7 @@ class YouTubeAPI:
             link = link.split("&")[0]
         video_id = None
         try:
+            from urllib.parse import urlparse, parse_qs
             url_data = urlparse(link)
             if url_data.hostname and "youtube" in url_data.hostname:
                 query = parse_qs(url_data.query)
@@ -537,6 +537,7 @@ class YouTubeAPI:
             link = link.split("&")[0]
         video_id = None
         try:
+            from urllib.parse import urlparse, parse_qs
             url_data = urlparse(link)
             if url_data.hostname and "youtube" in url_data.hostname:
                 query = parse_qs(url_data.query)
@@ -580,6 +581,7 @@ class YouTubeAPI:
             link = link.split("&")[0]
         video_id = None
         try:
+            from urllib.parse import urlparse, parse_qs
             url_data = urlparse(link)
             if url_data.hostname and "youtube" in url_data.hostname:
                 query = parse_qs(url_data.query)
