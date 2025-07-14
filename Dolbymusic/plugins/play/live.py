@@ -42,7 +42,8 @@ async def play_live_stream(client, CallbackQuery, _):
             pass
         return await mystic.edit_text(_["play_3"])
     ffplay = True if fplay == "f" else None
-    if not details.get("duration_min"):
+    # Defensive: details may be None or missing keys
+    if not details or not details.get("duration_min"):
         try:
             await stream(
                 _,
