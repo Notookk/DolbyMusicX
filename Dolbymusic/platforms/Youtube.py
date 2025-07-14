@@ -286,6 +286,7 @@ from typing import Union
 from pytubefix import YouTube, Playlist
 import asyncio
 import functools
+import os
 
 YOUTUBE_URL_RE = re.compile(
     r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+$'
@@ -302,7 +303,6 @@ async def get_file_with_pytubefix(video_id, audio=True):
 def sync_download(video_id, audio=True):
     url = f"https://www.youtube.com/watch?v={video_id}"
     yt = YouTube(url)
-    import os
     os.makedirs("downloads", exist_ok=True)
     if audio:
         stream = yt.streams.filter(only_audio=True).first()
@@ -310,6 +310,8 @@ def sync_download(video_id, audio=True):
     else:
         stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
         ext = "mp4"
+    if stream is None:
+        raise Exception("No suitable stream found for download")
     file_path = f"downloads/{video_id}.{ext}"
     stream.download(output_path="downloads", filename=f"{video_id}.{ext}")
     return file_path
@@ -372,8 +374,9 @@ class YouTubeAPI:
             }
         if "&" in link:
             link = link.split("&")[0]
+        loop = asyncio.get_event_loop()
         try:
-            yt = YouTube(link)
+            yt = await loop.run_in_executor(None, lambda: YouTube(link))
             title = yt.title
             duration_sec = getattr(yt, "length", None)
             if duration_sec is not None:
@@ -441,9 +444,10 @@ class YouTubeAPI:
             link = self.listbase + str(link)
         if "&" in link:
             link = link.split("&")[0]
+        loop = asyncio.get_event_loop()
         try:
-            pl = Playlist(link)
-            ids = [video.video_id for video in pl.videos[:limit]]
+            pl = await loop.run_in_executor(None, lambda: Playlist(link))
+            ids = [video.video_id for video in getattr(pl, "videos", [])[:limit] if hasattr(video, "video_id")]
             return ids
         except Exception as e:
             print(f"Failed to fetch playlist: {e}")
@@ -474,8 +478,9 @@ class YouTubeAPI:
             link = self.base + str(link)
         if "&" in link:
             link = link.split("&")[0]
+        loop = asyncio.get_event_loop()
         try:
-            yt = YouTube(link)
+            yt = await loop.run_in_executor(None, lambda: YouTube(link))
             return yt.title
         except Exception as e:
             print(f"Failed to fetch title: {e}")
@@ -486,8 +491,9 @@ class YouTubeAPI:
             link = self.base + str(link)
         if "&" in link:
             link = link.split("&")[0]
+        loop = asyncio.get_event_loop()
         try:
-            yt = YouTube(link)
+            yt = await loop.run_in_executor(None, lambda: YouTube(link))
             duration_sec = getattr(yt, "length", None)
             if duration_sec is not None:
                 return f"{duration_sec // 60}:{duration_sec % 60:02d}"
@@ -501,8 +507,9 @@ class YouTubeAPI:
             link = self.base + str(link)
         if "&" in link:
             link = link.split("&")[0]
+        loop = asyncio.get_event_loop()
         try:
-            yt = YouTube(link)
+            yt = await loop.run_in_executor(None, lambda: YouTube(link))
             return yt.thumbnail_url
         except Exception as e:
             print(f"Failed to fetch thumbnail: {e}")
@@ -546,16 +553,17 @@ class YouTubeAPI:
                 video_id = url_data.path[1:]
             else:
                 video_id = link
-            yt = YouTube(f"https://www.youtube.com/watch?v={video_id}")
+            loop = asyncio.get_event_loop()
+            yt = await loop.run_in_executor(None, lambda: YouTube(f"https://www.youtube.com/watch?v={video_id}"))
             formats_available = []
             for stream in yt.streams:
                 formats_available.append({
-                    "itag": stream.itag,
-                    "mime_type": stream.mime_type,
+                    "itag": getattr(stream, "itag", None),
+                    "mime_type": getattr(stream, "mime_type", None),
                     "abr": getattr(stream, "abr", None),
                     "resolution": getattr(stream, "resolution", None),
                     "type": "audio" if getattr(stream, "only_audio", False) else "video",
-                    "ext": stream.subtype,
+                    "ext": getattr(stream, "subtype", None),
                     "filesize": getattr(stream, "filesize", None),
                     "yturl": yt.watch_url,
                 })
