@@ -291,6 +291,7 @@ import os
 YOUTUBE_URL_RE = re.compile(
     r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+$'
 )
+
 def is_youtube_url(text: str) -> bool:
     if not isinstance(text, str):
         return False
@@ -319,47 +320,12 @@ def sync_download(video_id, audio=True):
 class YouTubeAPI:
     def __init__(self):
         self.base = "https://www.youtube.com/watch?v="
-        self.regex = r"(?:youtube\.com|youtu\.be)"
-        self.status = "https://www.youtube.com/oembed?url="
         self.listbase = "https://youtube.com/playlist?list="
-        self.reg = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
     async def exists(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + str(link)
         return is_youtube_url(link)
-
-    async def url(self, message_1) -> Union[str, None]:
-        messages = [message_1]
-        if hasattr(message_1, "reply_to_message") and getattr(message_1, "reply_to_message", None):
-            messages.append(message_1.reply_to_message)
-        text = ""
-        offset = None
-        length = None
-        for message in messages:
-            entities = getattr(message, "entities", None) or []
-            caption_entities = getattr(message, "caption_entities", None) or []
-            if offset:
-                break
-            if entities:
-                for entity in entities:
-                    etype = getattr(entity, "type", None)
-                    if hasattr(etype, "name"):
-                        etype = etype.name
-                    if etype == "URL":
-                        text = getattr(message, "text", None) or getattr(message, "caption", None) or ""
-                        offset, length = entity.offset, entity.length
-                        break
-            if caption_entities:
-                for entity in caption_entities:
-                    etype = getattr(entity, "type", None)
-                    if hasattr(etype, "name"):
-                        etype = etype.name
-                    if etype == "TEXT_LINK":
-                        return getattr(entity, "url", None)
-        if offset is None or not text:
-            return None
-        return text[offset : offset + length]
 
     async def details(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
@@ -374,9 +340,8 @@ class YouTubeAPI:
             }
         if "&" in link:
             link = link.split("&")[0]
-        loop = asyncio.get_event_loop()
         try:
-            yt = await loop.run_in_executor(None, lambda: YouTube(link))
+            yt = YouTube(link)
             title = yt.title
             duration_sec = getattr(yt, "length", None)
             if duration_sec is not None:
@@ -444,10 +409,9 @@ class YouTubeAPI:
             link = self.listbase + str(link)
         if "&" in link:
             link = link.split("&")[0]
-        loop = asyncio.get_event_loop()
         try:
-            pl = await loop.run_in_executor(None, lambda: Playlist(link))
-            ids = [video.video_id for video in getattr(pl, "videos", [])[:limit] if hasattr(video, "video_id")]
+            pl = Playlist(link)
+            ids = [video.video_id for video in pl.videos[:limit]]
             return ids
         except Exception as e:
             print(f"Failed to fetch playlist: {e}")
@@ -473,143 +437,4 @@ class YouTubeAPI:
             print(f"Failed to slider-search YouTube: {e}")
             return None, None, None, None
 
-    async def title(self, link: str, videoid: Union[bool, str] = None):
-        if videoid:
-            link = self.base + str(link)
-        if "&" in link:
-            link = link.split("&")[0]
-        loop = asyncio.get_event_loop()
-        try:
-            yt = await loop.run_in_executor(None, lambda: YouTube(link))
-            return yt.title
-        except Exception as e:
-            print(f"Failed to fetch title: {e}")
-            return None
-
-    async def duration(self, link: str, videoid: Union[bool, str] = None):
-        if videoid:
-            link = self.base + str(link)
-        if "&" in link:
-            link = link.split("&")[0]
-        loop = asyncio.get_event_loop()
-        try:
-            yt = await loop.run_in_executor(None, lambda: YouTube(link))
-            duration_sec = getattr(yt, "length", None)
-            if duration_sec is not None:
-                return f"{duration_sec // 60}:{duration_sec % 60:02d}"
-            return None
-        except Exception as e:
-            print(f"Failed to fetch duration: {e}")
-            return None
-
-    async def thumbnail(self, link: str, videoid: Union[bool, str] = None):
-        if videoid:
-            link = self.base + str(link)
-        if "&" in link:
-            link = link.split("&")[0]
-        loop = asyncio.get_event_loop()
-        try:
-            yt = await loop.run_in_executor(None, lambda: YouTube(link))
-            return yt.thumbnail_url
-        except Exception as e:
-            print(f"Failed to fetch thumbnail: {e}")
-            return None
-
-    async def video(self, link: str, videoid: Union[bool, str] = None):
-        if videoid:
-            link = self.base + str(link)
-        if "&" in link:
-            link = link.split("&")[0]
-        video_id = None
-        try:
-            from urllib.parse import urlparse, parse_qs
-            url_data = urlparse(link)
-            if url_data.hostname and "youtube" in url_data.hostname:
-                query = parse_qs(url_data.query)
-                video_id = query.get("v", [None])[0]
-            elif url_data.hostname == "youtu.be":
-                video_id = url_data.path[1:]
-            else:
-                video_id = link
-            file_path = await get_file_with_pytubefix(video_id, audio=False)
-            return 1, file_path
-        except Exception as e:
-            print(f"Failed to download video: {e}")
-            return 0, "Download failed"
-
-    async def formats(self, link: str, videoid: Union[bool, str] = None):
-        if videoid:
-            link = self.base + str(link)
-        if "&" in link:
-            link = link.split("&")[0]
-        video_id = None
-        try:
-            from urllib.parse import urlparse, parse_qs
-            url_data = urlparse(link)
-            if url_data.hostname and "youtube" in url_data.hostname:
-                query = parse_qs(url_data.query)
-                video_id = query.get("v", [None])[0]
-            elif url_data.hostname == "youtu.be":
-                video_id = url_data.path[1:]
-            else:
-                video_id = link
-            loop = asyncio.get_event_loop()
-            yt = await loop.run_in_executor(None, lambda: YouTube(f"https://www.youtube.com/watch?v={video_id}"))
-            formats_available = []
-            for stream in yt.streams:
-                formats_available.append({
-                    "itag": getattr(stream, "itag", None),
-                    "mime_type": getattr(stream, "mime_type", None),
-                    "abr": getattr(stream, "abr", None),
-                    "resolution": getattr(stream, "resolution", None),
-                    "type": "audio" if getattr(stream, "only_audio", False) else "video",
-                    "ext": getattr(stream, "subtype", None),
-                    "filesize": getattr(stream, "filesize", None),
-                    "yturl": yt.watch_url,
-                })
-            return formats_available, yt.watch_url
-        except Exception as e:
-            print(f"Failed to fetch formats: {e}")
-            return [], None
-
-    async def download(
-        self,
-        link: str,
-        mystic,
-        video: Union[bool, str] = None,
-        videoid: Union[bool, str] = None,
-        songaudio: Union[bool, str] = None,
-        songvideo: Union[bool, str] = None,
-        format_id: Union[bool, str] = None,
-        title: Union[bool, str] = None,
-    ) -> str:
-        if videoid:
-            link = self.base + str(link)
-        if "&" in link:
-            link = link.split("&")[0]
-        video_id = None
-        try:
-            from urllib.parse import urlparse, parse_qs
-            url_data = urlparse(link)
-            if url_data.hostname and "youtube" in url_data.hostname:
-                query = parse_qs(url_data.query)
-                video_id = query.get("v", [None])[0]
-            elif url_data.hostname == "youtu.be":
-                video_id = url_data.path[1:]
-            else:
-                video_id = link
-            if songvideo:
-                file_path = await get_file_with_pytubefix(video_id, audio=False)
-                return file_path, True
-            elif songaudio or not video:
-                file_path = await get_file_with_pytubefix(video_id, audio=True)
-                return file_path, True
-            elif video:
-                file_path = await get_file_with_pytubefix(video_id, audio=False)
-                return file_path, True
-            else:
-                file_path = await get_file_with_pytubefix(video_id, audio=True)
-                return file_path, True
-        except Exception as e:
-            print(f"Failed to download: {e}")
-            return None, False
+YouTube = YouTubeAPI()
